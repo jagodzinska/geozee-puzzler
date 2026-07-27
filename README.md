@@ -28,8 +28,8 @@ jeder Änderung hochgezählt werden.
   Ablage klicken). `Esc` hebt die Auswahl auf.
 - **Zum Eintragen**: Die Liste unten zeigt die Zuordnung in der festen
   Spielreihenfolge (1–9); die Zahl oben rechts auf einer Kategorie ist die
-  Position des dort liegenden Landes in dieser Reihenfolge. „Plan kopieren“ legt
-  die Liste als Text in die Zwischenablage.
+  Position des dort liegenden Landes in dieser Reihenfolge. Der Fortschritt
+  (`x / 9 zugeordnet`) steht in der Kopfzeile.
 - **Panel**: linke Kante ziehen ändert die Breite (Standard 960 px, dem Spiel
   bleiben immer mindestens 460 px), `✕` schließt es, der „PUZZLER“-Reiter am
   rechten Bildschirmrand öffnet es wieder.

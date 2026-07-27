@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geozee Puzzler
 // @namespace    jago/geozee-puzzler
-// @version      1.2.0
+// @version      1.3.0
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
@@ -286,8 +286,6 @@
   transition: border-color .15s, background-color .15s, color .15s;
 }
 .${NS}-btn:hover { border-color: var(--primary, #7d9b76); background: var(--surface-muted, #f0ebe3); }
-.${NS}-btn-primary { background: var(--primary, #7d9b76); color: var(--primary-foreground, #fff); border-color: transparent; }
-.${NS}-btn-primary:hover { background: var(--primary, #7d9b76); color: var(--primary-foreground, #fff); filter: brightness(1.07); }
 
 #${NS}-body {
   flex: 1; overflow-y: auto;
@@ -409,14 +407,10 @@
 #${NS}-plan .${NS}-arrow { color: var(--muted, #6b7280); }
 #${NS}-plan .${NS}-target { font-family: var(--font-display, "Sora", sans-serif); font-weight: 700; }
 
-#${NS}-foot {
-  display: flex; align-items: center; gap: calc(var(--sp) * 3);
-  padding: calc(var(--sp) * 3) calc(var(--sp) * 4);
-  border-top: 1px solid var(--border, #e8e4dd);
-  background: var(--surface-muted, #f0ebe3);
-  font-size: var(--text-sm, .875rem); color: var(--muted, #6b7280);
+#${NS}-head .${NS}-count {
+  font-size: var(--text-sm, .875rem); font-weight: 600;
+  color: var(--muted, #6b7280); white-space: nowrap;
 }
-#${NS}-foot .${NS}-count { flex: 1; }
 
 #${NS}-tab {
   position: fixed; right: 0; top: 50%; transform: translateY(-50%);
@@ -477,6 +471,7 @@
   <div id="${NS}-head">
     <span class="${NS}-title">Puzzler</span>
     <span class="${NS}-round" id="${NS}-round"></span>
+    <span class="${NS}-count" id="${NS}-count"></span>
     <button class="${NS}-btn" type="button" data-act="reset" title="Alle Zuordnungen löschen">Reset</button>
     <button class="${NS}-btn" type="button" data-act="close" title="Seitenleiste schließen">✕</button>
   </div>
@@ -493,10 +488,6 @@
       <div class="${NS}-h3"><b>Zum Eintragen</b> in dieser Reihenfolge</div>
       <ol id="${NS}-plan"></ol>
     </section>
-  </div>
-  <div id="${NS}-foot">
-    <span class="${NS}-count" id="${NS}-count"></span>
-    <button class="${NS}-btn ${NS}-btn-primary" type="button" data-act="copy">Plan kopieren</button>
   </div>
 </aside>`;
   document.body.appendChild(root);
@@ -724,18 +715,6 @@
       selected = null;
       savePlacements();
       render();
-    } else if (act === 'copy') {
-      const text = countries
-        .map((c, i) => `${i + 1}. ${c.name} → ${categoryOfCountry(c.code) || '???'}`)
-        .join('\n');
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          const old = btn.textContent;
-          btn.textContent = 'Kopiert ✓';
-          setTimeout(() => (btn.textContent = old), 1200);
-        })
-        .catch(() => {});
     }
   });
 
