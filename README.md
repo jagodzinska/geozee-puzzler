@@ -30,8 +30,9 @@ jeder Änderung hochgezählt werden.
   Spielreihenfolge (1–9); die Zahl oben rechts auf einer Kategorie ist die
   Position des dort liegenden Landes in dieser Reihenfolge. „Plan kopieren“ legt
   die Liste als Text in die Zwischenablage.
-- **Panel**: linke Kante ziehen ändert die Breite, `✕` schließt es, der
-  „PUZZLER“-Reiter am rechten Bildschirmrand öffnet es wieder.
+- **Panel**: linke Kante ziehen ändert die Breite (Standard 960 px, dem Spiel
+  bleiben immer mindestens 460 px), `✕` schließt es, der „PUZZLER“-Reiter am
+  rechten Bildschirmrand öffnet es wieder.
 
 Der Stand wird pro Tag in `localStorage` gespeichert (`geozee-puzzler:v1:<datum>`)
 und übersteht ein Neuladen. `Reset` leert ihn.
@@ -50,10 +51,21 @@ Züge im Spiel verändern die Leiste nicht und umgekehrt.
 
 ## Optik
 
-Statt eigener Farben nutzt die Leiste die CSS-Variablen der Seite
-(`--surface`, `--border`, `--primary`, `--muted`, `--radius`, `--font-display`,
-`--font-sans`) sowie deren eigene Kartenklasse `.mat-slot`. Dadurch sieht sie
-identisch zum Original aus und zieht ein späteres Theme automatisch mit.
+Statt eigener Werte nutzt die Leiste die CSS-Variablen der Seite — sowohl die
+Farben und Schriften (`--surface`, `--border`, `--primary`, `--muted`,
+`--radius`, `--font-display`, `--font-sans`) als auch die Tailwind-v4-Tokens für
+die Maße (`--spacing`, `--text-xs` … `--text-2xl`, `--leading-tight`,
+`--tracking-widest`) und die Kartenklasse `.mat-slot` selbst.
+
+Flaggen, Kartengrößen und Schriftgrade entsprechen damit 1:1 der
+Desktop-Darstellung des Originals: Ablage-Flaggen `h-10` wie die Warteschlange
+oben, Kategorienamen `text-lg`, Regeltext 11 px, abgelegte Flaggen `h-8 w-12`
+mit `text-base`-Ländername, Rasterabstand `gap-5`. Ein späteres Theme oder
+geänderte Tokens ziehen automatisch mit.
+
+Wird die Leiste schmal gezogen, schalten Container-Queries stufenweise auf
+kleinere Maße um (unter 700 px eine Stufe kleiner, unter 460 px zweispaltiges
+Raster ohne Regeltext); ab 780 px steht die Übertragungsliste zweispaltig.
 
 ## Getestet
 

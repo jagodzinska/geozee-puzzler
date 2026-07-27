@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geozee Puzzler
 // @namespace    jago/geozee-puzzler
-// @version      1.0.0
+// @version      1.2.0
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
@@ -41,7 +41,7 @@
 
   const NS = 'gzp';
   const STORE_PREFIX = 'geozee-puzzler:v1:';
-  const UI_KEY = 'geozee-puzzler:ui';
+  const UI_KEY = 'geozee-puzzler:ui:v2'; // v2: neue, breitere Standardbreite
   const FLAG_RE = /\/flags\/([a-z0-9_-]+)\.svg/i;
 
   // ===========================================================================
@@ -154,7 +154,13 @@
   let selected = null; // aktuell "in der Hand" gehaltener Ländercode
   let currentDate = roundDate();
 
-  const ui = Object.assign({ open: true, width: 480 }, readJSON(UI_KEY, {}));
+  // Breite: großzügig, aber dem Spiel bleiben mindestens MIN_PAGE Pixel.
+  const DEFAULT_WIDTH = 960;
+  const MIN_WIDTH = 340;
+  const MIN_PAGE = 460;
+  const clampWidth = (w) => Math.max(MIN_WIDTH, Math.min(w, Math.max(MIN_WIDTH, window.innerWidth - MIN_PAGE)));
+
+  const ui = Object.assign({ open: true, width: DEFAULT_WIDTH }, readJSON(UI_KEY, {}));
 
   const storeKey = () => STORE_PREFIX + currentDate;
 
@@ -218,17 +224,24 @@
   // Aufbau der Seitenleiste
   // ===========================================================================
 
+  // Maße und Schriftgrößen kommen aus denselben Tailwind-v4-Tokens, die die
+  // Seite selbst benutzt (--spacing, --text-*, --leading-tight, --radius ...).
+  // Basis ist damit 1:1 die Desktop-Darstellung des Originals; erst wenn die
+  // Leiste schmal gezogen wird, greifen weiter unten die Container-Queries.
   const CSS = `
+#${NS}-root { --sp: var(--spacing, .25rem); }
 #${NS}-root, #${NS}-root * { box-sizing: border-box; }
 
 #${NS}-panel {
   position: fixed; top: 0; right: 0; bottom: 0;
-  width: var(--${NS}-w, 480px);
+  width: var(--${NS}-w, ${DEFAULT_WIDTH}px);
   display: flex; flex-direction: column;
+  container-type: inline-size; container-name: ${NS};
   background: var(--surface, #fff);
   border-left: 1px solid var(--border, #e8e4dd);
   box-shadow: -8px 0 24px rgb(0 0 0 / .08);
   font-family: var(--font-sans, "Manrope", sans-serif);
+  font-size: var(--text-base, 1rem);
   color: var(--foreground, #2d2d2d);
   z-index: 2147482000;
 }
@@ -240,30 +253,35 @@
 }
 #${NS}-grip:hover { background: var(--primary, #7d9b76); opacity: .35; }
 
+/* --- Kopfzeile: Maße wie die Kopfzeile der Seite (h-14, px-4) ------------- */
 #${NS}-head {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .75rem 1rem;
+  display: flex; align-items: center; gap: calc(var(--sp) * 3);
+  min-height: calc(var(--sp) * 14);
+  padding: calc(var(--sp) * 2) calc(var(--sp) * 4);
   border-bottom: 1px solid var(--border, #e8e4dd);
   background: var(--surface-muted, #f0ebe3);
 }
 #${NS}-head .${NS}-title {
   font-family: var(--font-display, "Sora", sans-serif);
-  font-weight: 800; font-size: .95rem; line-height: 1;
+  font-weight: 800; font-size: var(--text-2xl, 1.5rem); line-height: 1;
 }
 #${NS}-head .${NS}-round {
   flex: 1; min-width: 0;
-  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--muted, #6b7280);
+  font-size: var(--text-xs, .75rem);
+  letter-spacing: var(--tracking-widest, .1em);
+  text-transform: uppercase; color: var(--muted, #6b7280);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Pill-Button wie "Category Atlas" auf der Seite */
 .${NS}-btn {
   border: 1px solid var(--border, #e8e4dd);
   background: var(--surface, #fff);
   color: var(--foreground, #2d2d2d);
   border-radius: 9999px;
-  padding: .3rem .7rem;
-  font: inherit; font-size: 11px; font-weight: 700;
+  padding: calc(var(--sp) * 1.5) calc(var(--sp) * 3);
+  font: inherit; font-size: var(--text-sm, .875rem); font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05);
   cursor: pointer; white-space: nowrap;
   transition: border-color .15s, background-color .15s, color .15s;
 }
@@ -271,141 +289,182 @@
 .${NS}-btn-primary { background: var(--primary, #7d9b76); color: var(--primary-foreground, #fff); border-color: transparent; }
 .${NS}-btn-primary:hover { background: var(--primary, #7d9b76); color: var(--primary-foreground, #fff); filter: brightness(1.07); }
 
-#${NS}-body { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
-
-.${NS}-h3 {
-  display: flex; align-items: baseline; gap: .5rem; margin-bottom: .5rem;
-  font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--muted, #6b7280);
+#${NS}-body {
+  flex: 1; overflow-y: auto;
+  padding: calc(var(--sp) * 4);
+  display: flex; flex-direction: column; gap: calc(var(--sp) * 5);
 }
-.${NS}-h3 b { color: var(--foreground, #2d2d2d); font-weight: 700; letter-spacing: normal; text-transform: none; font-size: 11px; }
 
-/* --- Ablage mit allen 9 Ländern in fester Reihenfolge --------------------- */
+/* Abschnittsüberschrift im Stil der Seitenlabels ("SCORE", "Now placing") */
+.${NS}-h3 {
+  display: flex; align-items: baseline; gap: calc(var(--sp) * 2);
+  margin-bottom: calc(var(--sp) * 2);
+  font-size: var(--text-xs, .75rem);
+  letter-spacing: var(--tracking-widest, .1em);
+  text-transform: uppercase; color: var(--muted, #6b7280);
+}
+.${NS}-h3 b {
+  color: var(--foreground, #2d2d2d); font-weight: 700;
+  font-size: var(--text-sm, .875rem); letter-spacing: normal; text-transform: none;
+}
+
+/* --- Ablage: Flaggen so groß wie in der Warteschlange oben (md:h-10) ------ */
 #${NS}-tray {
-  display: flex; flex-wrap: wrap; gap: .375rem;
-  padding: .5rem;
+  display: flex; flex-wrap: wrap; gap: calc(var(--sp) * 2);
+  padding: calc(var(--sp) * 3);
   border: 1px dashed var(--border, #e8e4dd);
   border-radius: var(--radius, .75rem);
   background: var(--surface-muted, #f0ebe3);
-  min-height: 3rem;
+  min-height: calc(var(--sp) * 18);
 }
 #${NS}-tray.${NS}-dropok { border-color: var(--primary, #7d9b76); border-style: solid; }
 
 .${NS}-chip {
-  display: inline-flex; align-items: center; gap: .375rem;
-  padding: .25rem .5rem .25rem .3rem;
-  border: 1px solid var(--border, #e8e4dd);
+  display: inline-flex; align-items: center; gap: calc(var(--sp) * 2);
+  padding: calc(var(--sp) * 1.5) calc(var(--sp) * 3) calc(var(--sp) * 1.5) calc(var(--sp) * 1.5);
   border-radius: 9999px;
   background: var(--surface, #fff);
+  box-shadow: 0 0 0 1px var(--border, #e8e4dd);
   cursor: grab; user-select: none;
-  font-size: 11px; line-height: 1.1;
-  transition: box-shadow .15s, transform .15s, opacity .15s;
+  font-size: var(--text-base, 1rem); line-height: var(--leading-tight, 1.25);
+  transition: box-shadow .15s, opacity .15s;
 }
-.${NS}-chip:hover { box-shadow: 0 4px 12px rgb(0 0 0 / .1); }
+.${NS}-chip:hover { box-shadow: 0 0 0 1px var(--border, #e8e4dd), 0 6px 16px rgb(0 0 0 / .1); }
 .${NS}-chip:active { cursor: grabbing; }
-.${NS}-chip img { height: 14px; width: 21px; object-fit: cover; border-radius: 2px; border: 1px solid rgb(0 0 0 / .1); }
+.${NS}-chip img {
+  height: calc(var(--sp) * 10); width: auto;
+  border-radius: .25rem; background: var(--surface-muted, #f0ebe3);
+}
 .${NS}-chip .${NS}-num {
   display: inline-flex; align-items: center; justify-content: center;
-  height: 15px; min-width: 15px; padding: 0 3px;
+  height: calc(var(--sp) * 6); min-width: calc(var(--sp) * 6); padding: 0 calc(var(--sp) * 1);
   border-radius: 9999px;
-  background: var(--surface-muted, #f0ebe3);
-  color: var(--muted, #6b7280);
-  font-size: 9px; font-weight: 800;
+  background: var(--surface-muted, #f0ebe3); color: var(--muted, #6b7280);
+  font-size: var(--text-xs, .75rem); font-weight: 800;
 }
 .${NS}-chip.${NS}-placed { opacity: .4; }
-.${NS}-chip.${NS}-sel {
-  border-color: var(--primary, #7d9b76);
-  box-shadow: 0 0 0 2px var(--primary, #7d9b76);
-  opacity: 1;
-}
+.${NS}-chip.${NS}-sel { box-shadow: 0 0 0 2px var(--primary, #7d9b76); opacity: 1; }
 .${NS}-chip.${NS}-dragging { opacity: .3; }
 
-/* --- Kategorie-Raster ----------------------------------------------------- */
-#${NS}-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
-
-/* .mat-slot kommt von der Seite selbst (Radius, Transition, Cursor);
-   hier nur die Maße an die schmalere Leiste anpassen. */
-#${NS}-grid .mat-slot {
-  min-height: 118px; padding: .5rem;
-  display: flex; flex-direction: column;
-  border: 1px solid var(--border, #e8e4dd);
-  background: var(--surface, #fff);
-  outline: none;
+/* --- Kategorie-Raster: .mat-slot liefert Radius, min-height 140px und
+       padding 1rem von der Seite selbst, hier nur Layout und Zustände ------ */
+#${NS}-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--sp) * 5);
 }
-#${NS}-grid .mat-slot:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / .08); }
-#${NS}-grid .mat-slot.${NS}-dropok { outline: 2px solid var(--primary, #7d9b76); outline-offset: 2px; }
-#${NS}-grid .mat-slot.${NS}-armed { outline: 2px dashed var(--primary, #7d9b76); outline-offset: 2px; }
+#${NS}-grid .mat-slot { display: flex; flex-direction: column; background: var(--surface, #fff); }
+#${NS}-grid .mat-slot:not(.${NS}-filled) { outline: 2px solid var(--primary, #7d9b76); outline-offset: 2px; }
+#${NS}-grid .mat-slot.${NS}-filled { box-shadow: inset 0 0 0 1px var(--border, #e8e4dd); }
+#${NS}-grid .mat-slot:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgb(0 0 0 / .08); }
+#${NS}-grid .mat-slot.${NS}-dropok,
+#${NS}-grid .mat-slot.${NS}-armed { outline: 3px solid var(--primary, #7d9b76); outline-offset: 2px; }
 
 .${NS}-cat-name {
   font-family: var(--font-display, "Sora", sans-serif);
-  font-weight: 700; font-size: 12px; line-height: 1.15;
+  font-weight: 700; font-size: var(--text-lg, 1.125rem); line-height: var(--leading-tight, 1.25);
 }
 .${NS}-cat-rule {
-  margin-top: .25rem; padding-top: .3rem;
-  border-top: 1px solid rgb(0 0 0 / .12);
-  font-size: 9.5px; line-height: 1.25;
-  color: var(--muted, #6b7280);
+  margin-top: calc(var(--sp) * 1.5); padding-top: calc(var(--sp) * 2);
+  border-top: 1px solid color-mix(in oklab, var(--foreground, #2d2d2d) 20%, transparent);
+  font-size: 11px; line-height: var(--leading-tight, 1.25);
+  color: color-mix(in oklab, var(--foreground, #2d2d2d) 75%, transparent);
 }
-.${NS}-cat-foot { margin-top: auto; padding-top: .4rem; }
+.${NS}-cat-foot { margin-top: auto; padding-top: calc(var(--sp) * 3); }
 .${NS}-cat-empty {
-  text-align: center; font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--foreground, #2d2d2d) 35%, transparent);
+  text-align: center; font-size: var(--text-xs, .75rem);
+  letter-spacing: .2em; text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground, #2d2d2d) 40%, transparent);
 }
-.${NS}-cat-fill { display: flex; align-items: center; gap: .35rem; cursor: grab; }
-.${NS}-cat-fill img { height: 18px; width: 27px; flex: none; object-fit: cover; border-radius: 3px; border: 1px solid rgb(0 0 0 / .1); }
+.${NS}-cat-fill { display: flex; align-items: center; gap: calc(var(--sp) * 3); cursor: grab; }
+.${NS}-cat-fill img {
+  height: calc(var(--sp) * 8); width: calc(var(--sp) * 12); flex: none;
+  object-fit: cover; border-radius: .25rem;
+  border: 1px solid color-mix(in oklab, var(--foreground, #2d2d2d) 10%, transparent);
+}
 .${NS}-cat-fill span {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font-display, "Sora", sans-serif); font-size: 10.5px;
+  font-family: var(--font-display, "Sora", sans-serif); font-size: var(--text-base, 1rem);
 }
 .${NS}-slot-num {
-  position: absolute; right: .4rem; top: .4rem;
+  position: absolute; right: calc(var(--sp) * 3); top: calc(var(--sp) * 3);
   display: inline-flex; align-items: center; justify-content: center;
-  height: 17px; min-width: 17px; padding: 0 4px;
+  min-width: calc(var(--sp) * 7); padding: calc(var(--sp) * 1) calc(var(--sp) * 2);
   border-radius: 9999px;
   background: var(--primary, #7d9b76); color: var(--primary-foreground, #fff);
-  font-size: 9px; font-weight: 800;
+  font-size: var(--text-sm, .875rem); font-weight: 700; line-height: 1;
 }
 
 /* --- Übertragungsliste ---------------------------------------------------- */
-#${NS}-plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
+#${NS}-plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--sp) * 1); }
 #${NS}-plan li {
-  display: flex; align-items: center; gap: .4rem;
-  padding: .25rem .5rem;
-  border-radius: .4rem;
+  display: flex; align-items: center; gap: calc(var(--sp) * 2);
+  padding: calc(var(--sp) * 1.5) calc(var(--sp) * 3);
+  border-radius: calc(var(--radius, .75rem) * .6);
   background: var(--surface-muted, #f0ebe3);
-  font-size: 11px;
+  font-size: var(--text-base, 1rem);
 }
 #${NS}-plan li.${NS}-todo { background: transparent; color: var(--muted, #6b7280); }
-#${NS}-plan img { height: 12px; width: 18px; object-fit: cover; border-radius: 2px; }
-#${NS}-plan .${NS}-idx { min-width: 14px; font-weight: 800; color: var(--muted, #6b7280); }
+#${NS}-plan img { height: calc(var(--sp) * 5); width: calc(var(--sp) * 8); flex: none; object-fit: cover; border-radius: .25rem; }
+#${NS}-plan .${NS}-idx { min-width: calc(var(--sp) * 6); font-weight: 800; color: var(--muted, #6b7280); }
 #${NS}-plan .${NS}-arrow { color: var(--muted, #6b7280); }
 #${NS}-plan .${NS}-target { font-family: var(--font-display, "Sora", sans-serif); font-weight: 700; }
 
 #${NS}-foot {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .6rem 1rem;
+  display: flex; align-items: center; gap: calc(var(--sp) * 3);
+  padding: calc(var(--sp) * 3) calc(var(--sp) * 4);
   border-top: 1px solid var(--border, #e8e4dd);
   background: var(--surface-muted, #f0ebe3);
-  font-size: 11px; color: var(--muted, #6b7280);
+  font-size: var(--text-sm, .875rem); color: var(--muted, #6b7280);
 }
 #${NS}-foot .${NS}-count { flex: 1; }
 
 #${NS}-tab {
   position: fixed; right: 0; top: 50%; transform: translateY(-50%);
   z-index: 2147482000;
-  padding: .7rem .45rem;
+  padding: calc(var(--spacing, .25rem) * 3) calc(var(--spacing, .25rem) * 2);
   border: 1px solid var(--border, #e8e4dd); border-right: none;
   border-radius: var(--radius, .75rem) 0 0 var(--radius, .75rem);
   background: var(--surface, #fff); color: var(--foreground, #2d2d2d);
   font-family: var(--font-display, "Sora", sans-serif);
-  font-size: 11px; font-weight: 700; letter-spacing: .1em;
-  writing-mode: vertical-rl;
-  cursor: pointer;
+  font-size: var(--text-sm, .875rem); font-weight: 700;
+  letter-spacing: var(--tracking-widest, .1em);
+  writing-mode: vertical-rl; cursor: pointer;
   box-shadow: -4px 0 12px rgb(0 0 0 / .08);
 }
 #${NS}-root:not(.${NS}-closed) #${NS}-tab { display: none; }
 
-.${NS}-empty-hint { padding: 2rem 1rem; text-align: center; font-size: 12px; color: var(--muted, #6b7280); }
+.${NS}-empty-hint { padding: 2rem 1rem; text-align: center; font-size: var(--text-sm, .875rem); color: var(--muted, #6b7280); }
+
+/* --- Sehr breite Leiste: Übertragungsliste zweispaltig, spaltenweise
+       gefüllt (1–5 links, 6–9 rechts), damit nichts scrollen muss --------- */
+@container ${NS} (min-width: 780px) {
+  #${NS}-plan {
+    display: grid; grid-auto-flow: column;
+    grid-template-rows: repeat(5, auto); grid-auto-columns: 1fr;
+    column-gap: calc(var(--sp) * 3);
+  }
+}
+
+/* --- Schmal gezogene Leiste: alles eine Stufe kleiner --------------------- */
+@container ${NS} (max-width: 700px) {
+  #${NS}-body { padding: calc(var(--sp) * 3); gap: calc(var(--sp) * 4); }
+  .${NS}-chip { font-size: var(--text-sm, .875rem); }
+  .${NS}-chip img { height: calc(var(--sp) * 7); }
+  #${NS}-grid { gap: calc(var(--sp) * 3); }
+  #${NS}-grid .mat-slot { min-height: calc(var(--sp) * 30); padding: calc(var(--sp) * 2.5); }
+  .${NS}-cat-name { font-size: var(--text-base, 1rem); }
+  .${NS}-cat-rule { font-size: 10px; }
+  .${NS}-cat-fill img { height: calc(var(--sp) * 6); width: calc(var(--sp) * 9); }
+  .${NS}-cat-fill span { font-size: var(--text-sm, .875rem); }
+  .${NS}-slot-num { font-size: var(--text-xs, .75rem); }
+  #${NS}-plan li { font-size: var(--text-sm, .875rem); }
+}
+
+@container ${NS} (max-width: 460px) {
+  #${NS}-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .${NS}-chip img { height: calc(var(--sp) * 5); }
+  .${NS}-cat-rule { display: none; }
+}
 `;
 
   const root = document.createElement('div');
@@ -456,10 +515,11 @@
   // ===========================================================================
 
   function applyUI() {
+    const w = clampWidth(ui.width);
     root.classList.toggle(`${NS}-closed`, !ui.open);
-    root.style.setProperty(`--${NS}-w`, ui.width + 'px');
+    root.style.setProperty(`--${NS}-w`, w + 'px');
     // Seiteninhalt neben der Leiste halten statt darunter zu verschwinden
-    document.body.style.paddingRight = ui.open ? ui.width + 'px' : '';
+    document.body.style.paddingRight = ui.open ? w + 'px' : '';
   }
 
   function renderTray() {
@@ -488,7 +548,8 @@
       const queueIdx = country ? countries.findIndex((c) => c.code === code) + 1 : 0;
 
       const slot = document.createElement('div');
-      slot.className = 'mat-slot' + (selected ? ` ${NS}-armed` : '');
+      slot.className =
+        'mat-slot' + (country ? ` ${NS}-filled` : '') + (selected && !country ? ` ${NS}-armed` : '');
       slot.dataset.cat = cat.id;
       slot.setAttribute('role', 'button');
       slot.tabIndex = 0;
@@ -690,7 +751,7 @@
     const grip = ev.currentTarget;
     grip.setPointerCapture(ev.pointerId);
     const onMove = (e) => {
-      ui.width = Math.max(340, Math.min(window.innerWidth - 200, window.innerWidth - e.clientX));
+      ui.width = clampWidth(window.innerWidth - e.clientX);
       applyUI();
     };
     const onUp = () => {
@@ -746,4 +807,7 @@
 
   // SPA-Navigation (Archiv <-> heute) mitbekommen
   window.addEventListener('popstate', () => setTimeout(sync, 300));
+
+  // Bei kleinerem Fenster nachziehen, damit dem Spiel Platz bleibt
+  window.addEventListener('resize', applyUI);
 })();
