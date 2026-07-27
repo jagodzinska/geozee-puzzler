@@ -5,6 +5,10 @@
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
+// @homepageURL  https://github.com/jagodzinska/geozee-puzzler
+// @supportURL   https://github.com/jagodzinska/geozee-puzzler/issues
+// @downloadURL  https://raw.githubusercontent.com/jagodzinska/geozee-puzzler/main/geozee-puzzler.user.js
+// @updateURL    https://raw.githubusercontent.com/jagodzinska/geozee-puzzler/main/geozee-puzzler.user.js
 // @match        https://geozee.earth/*
 // @icon         https://geozee.earth/favicon.ico
 // @run-at       document-idle

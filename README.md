@@ -7,6 +7,17 @@ frei in die 9 Kategorien geschoben und beliebig oft umsortiert werden können.
 Das Ergebnis wird danach **von Hand** im echten Spiel eingetragen — das Skript
 klickt nichts an.
 
+## Installation
+
+Bei installiertem Tampermonkey diese URL im Browser öffnen — der Installations-
+Dialog geht dann von selbst auf:
+
+<https://raw.githubusercontent.com/jagodzinska/geozee-puzzler/main/geozee-puzzler.user.js>
+
+`@updateURL`/`@downloadURL` zeigen auf dieselbe Datei, Tampermonkey holt sich
+Updates also automatisch von `main`. Dafür muss die `@version` im Header bei
+jeder Änderung hochgezählt werden.
+
 ## Bedienung
 
 - **Zuordnen**: Flagge aus der Ablage in eine Kategorie ziehen — oder Flagge
