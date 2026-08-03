@@ -34,6 +34,14 @@ jeder Änderung hochgezählt werden.
   bleiben immer mindestens 460 px), `✕` schließt es, der „PUZZLER“-Reiter am
   rechten Bildschirmrand öffnet es wieder.
 
+- **Dialoge des Spiels**: Klickt man im Spiel eine Flagge an, zeigt Geozee sie
+  vergrößert in einem Dialog — der zentriert sich normalerweise im ganzen
+  Fenster und liegt damit zur Hälfte hinter der Leiste. Das Skript zieht solche
+  `position: fixed`-Overlays auf den freien Bereich links der Leiste, sodass sie
+  dort mittig stehen. Das gilt für alle Overlays der Seite (Modals, Toasts,
+  Konfetti, Cookie-Banner) und geht beim Breiterziehen live mit; ist die Leiste
+  geschlossen, sitzt wieder alles wie im Original.
+
 Der Stand wird pro Tag in `localStorage` gespeichert (`geozee-puzzler:v1:<datum>`)
 und übersteht ein Neuladen. `Reset` leert ihn.
 
@@ -73,3 +81,9 @@ Gegen die Live-Seite (Headless Chrome via CDP): Auslesen von Ländern und
 Kategorien, Klick- und Drag&Drop-Zuordnung, Tausch belegter Felder, Zurücklegen,
 Reset, Schließen/Öffnen, Persistenz über einen Reload hinweg sowie Weiterlaufen
 nach einem echten Spielzug (React baut das Board dabei neu auf).
+
+Für die Overlay-Zentrierung nachgemessen: die vergrößerte Flagge und ihr
+Hintergrund sitzen bei 960 px und bei 500 px Leistenbreite exakt mittig im
+Restbereich, bei geschlossener Leiste wieder mittig im Fenster — waagerecht wie
+senkrecht (die Seite ist Tailwind v4 und zentriert per `translate`; das Skript
+verschiebt deshalb über `right`/`margin`, nicht über `transform`).

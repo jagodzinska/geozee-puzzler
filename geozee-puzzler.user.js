@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geozee Puzzler
 // @namespace    jago/geozee-puzzler
-// @version      1.3.0
+// @version      1.4.0
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
@@ -429,6 +429,20 @@
 
 .${NS}-empty-hint { padding: 2rem 1rem; text-align: center; font-size: var(--text-sm, .875rem); color: var(--muted, #6b7280); }
 
+/* --- Overlays der Seite (Flaggen-Dialog, Modals, Toasts) --------------------
+   Die liegen als "position: fixed" im Viewport und wissen nichts von der
+   Leiste – ihre Mitte landet deshalb halb dahinter. Die Klassen vergibt
+   scanOverlays(), --${NS}-shift ist die aktuelle Leistenbreite (0px, solange
+   die Leiste zu ist). Verschoben wird über Rand/Kante statt über transform
+   oder translate: die Seite ist Tailwind v4 und zentriert ihre Dialoge selbst
+   per "translate" – das dürfen wir nicht überschreiben.                      */
+.${NS}-shift-inset {
+  right: var(--${NS}-shift, 0px) !important;
+  max-width: calc(100% - var(--${NS}-shift, 0px)) !important; /* falls die Breite fest steht */
+}
+.${NS}-shift-offset { margin-left: calc(var(--${NS}-shift, 0px) / -2) !important; }
+.${NS}-shift-auto { margin-right: var(--${NS}-shift, 0px) !important; }
+
 /* --- Sehr breite Leiste: Übertragungsliste zweispaltig, spaltenweise
        gefüllt (1–5 links, 6–9 rechts), damit nichts scrollen muss --------- */
 @container ${NS} (min-width: 780px) {
@@ -511,6 +525,8 @@
     root.style.setProperty(`--${NS}-w`, w + 'px');
     // Seiteninhalt neben der Leiste halten statt darunter zu verschwinden
     document.body.style.paddingRight = ui.open ? w + 'px' : '';
+    // Fixe Overlays der Seite folgen der Breite über diese Variable
+    document.documentElement.style.setProperty(`--${NS}-shift`, ui.open ? w + 'px' : '0px');
   }
 
   function renderTray() {
@@ -743,6 +759,64 @@
   });
 
   // ===========================================================================
+  // Overlays der Seite neben der Leiste zentrieren
+  //
+  // Klickt man im Spiel eine Flagge an, öffnet sich ein Dialog als
+  // "fixed inset-0 … items-center justify-center" – also mittig im ganzen
+  // Viewport, und damit zur Hälfte hinter der Leiste. Dasselbe gilt für die
+  // übrigen Modals, den Toast und den Konfetti-Layer.
+  //
+  // Statt einzelne Klassennamen der Seite festzunageln, werden fixe Elemente
+  // an ihrer Geometrie erkannt und bekommen eine Klasse, die sie über
+  // --${NS}-shift einzieht bzw. verschiebt:
+  //   - volle Viewport-Breite -> rechte Kante auf die Leiste ziehen
+  //   - schmaler, aber mittig -> hängt die Box an left:50%, reicht ein
+  //     margin-left von einer halben Leistenbreite; wird sie dagegen per
+  //     "margin: auto" zwischen ihren Kanten zentriert, verschiebt ein
+  //     margin-right von einer ganzen Leistenbreite genau diesen Raum
+  // Die Klassen bleiben dauerhaft dran; ist die Leiste zu, ist --shift 0px.
+  // ===========================================================================
+
+  // Overlays landen fast immer direkt an <body> (React-Portale, Cookie-Banner);
+  // der Rest der Seite ist Tailwind, dort steht "fixed" in der Klassenliste.
+  const OVERLAY_SEL = '[class*="fixed"], [role="dialog"], [aria-modal="true"], dialog';
+  const SHIFT_CLASSES = [`${NS}-shift-inset`, `${NS}-shift-offset`, `${NS}-shift-auto`];
+  let overlayFrame = 0;
+
+  function scanOverlays() {
+    overlayFrame = 0;
+    const vw = document.documentElement.clientWidth;
+    const seen = new Set();
+
+    for (const el of [...document.body.children, ...document.querySelectorAll(OVERLAY_SEL)]) {
+      if (seen.has(el) || SHIFT_CLASSES.some((c) => el.classList.contains(c))) continue;
+      seen.add(el);
+      if (el.closest(`#${NS}-root`)) continue;
+
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'fixed') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+
+      if (r.left <= 1 && r.right >= vw - 1) {
+        el.classList.add(`${NS}-shift-inset`);
+      } else if (Math.abs((r.left + r.right) / 2 - vw / 2) <= 2) {
+        // "margin: auto zwischen left und right" vs. "hängt an einer Kante"
+        const auto = parseFloat(cs.marginLeft) > 0 && parseFloat(cs.marginRight) > 0;
+        el.classList.add(auto ? `${NS}-shift-auto` : `${NS}-shift-offset`);
+      }
+    }
+  }
+
+  function queueOverlayScan() {
+    if (!overlayFrame) overlayFrame = requestAnimationFrame(scanOverlays);
+  }
+
+  // Ein Klick im Spiel öffnet die Dialoge – da soll die Korrektur schon sitzen,
+  // bevor das Overlay das erste Mal gezeichnet wird.
+  document.addEventListener('click', queueOverlayScan, true);
+
+  // ===========================================================================
   // Seite beobachten – React baut das Board bei jedem Zug neu auf
   // ===========================================================================
 
@@ -774,11 +848,13 @@
   applyUI();
   render();
   sync();
+  scanOverlays();
 
   let pending = null;
   const observer = new MutationObserver((records) => {
     // Eigene DOM-Änderungen ignorieren, sonst dreht sich das im Kreis
     if (records.every((r) => r.target instanceof Element && r.target.closest(`#${NS}-root`))) return;
+    queueOverlayScan();
     clearTimeout(pending);
     pending = setTimeout(sync, 200);
   });
@@ -788,5 +864,8 @@
   window.addEventListener('popstate', () => setTimeout(sync, 300));
 
   // Bei kleinerem Fenster nachziehen, damit dem Spiel Platz bleibt
-  window.addEventListener('resize', applyUI);
+  window.addEventListener('resize', () => {
+    applyUI();
+    queueOverlayScan();
+  });
 })();
