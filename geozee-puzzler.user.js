@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geozee Puzzler
 // @namespace    jago/geozee-puzzler
-// @version      1.4.0
+// @version      1.5.0
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
@@ -443,6 +443,29 @@
 .${NS}-shift-offset { margin-left: calc(var(--${NS}-shift, 0px) / -2) !important; }
 .${NS}-shift-auto { margin-right: var(--${NS}-shift, 0px) !important; }
 
+/* --- Anzeigenspalten der Seite schmal halten -------------------------------
+   Das Board sitzt in einer Flex-Zeile aus drei Spalten: links und rechts je
+   eine Anzeigenspalte ("flex-1 max-w-[350px]"), dazwischen das Spiel. Alle
+   drei wachsen gleich stark, das Spiel bekommt also nur ein Drittel der
+   Breite – auch dann, wenn in den Spalten gar keine Anzeige steht. Neben der
+   offenen Leiste bleibt davon so wenig übrig, dass die Kartentexte aus ihren
+   Karten laufen und sich überlagern.
+
+   Solange die Leiste offen ist, hören die beiden Spalten deshalb auf zu
+   wachsen und sind nur noch so breit wie ihr Inhalt: leer also gar nicht,
+   mit geladener Anzeige weiterhin genau so breit wie diese. Die Klasse
+   vergibt tagAdRails(); bei geschlossener Leiste greift die Regel nicht und
+   die Seite steht wieder im Original.                                        */
+html.${NS}-open .${NS}-rail {
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+/* Sicherheitsnetz: bleibt der Bereich trotzdem eng (Tablet, sehr breite
+   Leiste), brechen zu lange Wörter um, statt aus ihrer Karte zu laufen.
+   "anywhere" statt "break-word", weil nur das auch die Mindestbreite der
+   Flex-/Grid-Kinder mitzieht – sonst überlappt die Karte weiterhin.       */
+html.${NS}-open main { overflow-wrap: anywhere; }
+
 /* --- Sehr breite Leiste: Übertragungsliste zweispaltig, spaltenweise
        gefüllt (1–5 links, 6–9 rechts), damit nichts scrollen muss --------- */
 @container ${NS} (min-width: 780px) {
@@ -522,6 +545,7 @@
   function applyUI() {
     const w = clampWidth(ui.width);
     root.classList.toggle(`${NS}-closed`, !ui.open);
+    document.documentElement.classList.toggle(`${NS}-open`, ui.open);
     root.style.setProperty(`--${NS}-w`, w + 'px');
     // Seiteninhalt neben der Leiste halten statt darunter zu verschwinden
     document.body.style.paddingRight = ui.open ? w + 'px' : '';
@@ -808,8 +832,28 @@
     }
   }
 
+  // Die Anzeigenspalten links und rechts des Boards markieren (siehe CSS).
+  // Gesucht wird von <main> aus nach oben die erste Flex-Zeile mit mehreren
+  // Kindern; deren übrige Kinder sind die beiden Spalten. Das kommt ohne die
+  // Klassennamen der Seite aus und trifft auch nichts außerhalb dieser Zeile.
+  function tagAdRails() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    for (let col = main; col.parentElement && col.parentElement !== document.body; col = col.parentElement) {
+      const row = col.parentElement;
+      if (getComputedStyle(row).display !== 'flex' || row.children.length < 2) continue;
+      for (const el of row.children) if (el !== col) el.classList.add(`${NS}-rail`);
+      return;
+    }
+  }
+
   function queueOverlayScan() {
-    if (!overlayFrame) overlayFrame = requestAnimationFrame(scanOverlays);
+    if (!overlayFrame) {
+      overlayFrame = requestAnimationFrame(() => {
+        tagAdRails();
+        scanOverlays();
+      });
+    }
   }
 
   // Ein Klick im Spiel öffnet die Dialoge – da soll die Korrektur schon sitzen,
@@ -848,6 +892,7 @@
   applyUI();
   render();
   sync();
+  tagAdRails();
   scanOverlays();
 
   let pending = null;
