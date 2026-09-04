@@ -49,8 +49,9 @@ jeder Änderung hochgezählt werden.
   davon so wenig übrig, dass die Kartentexte aus ihren Karten laufen. Solange
   die Leiste offen ist, hören die beiden Spalten deshalb auf zu wachsen und sind
   nur noch so breit wie ihr Inhalt: leer also gar nicht, mit geladener Anzeige
-  weiterhin genau so breit wie diese. Bei geschlossener Leiste steht die Seite
-  wieder im Original. Als Sicherheitsnetz brechen im Spielbereich zu lange
+  weiterhin genau so breit wie diese. Den „Remove ads“-Knopf, der die linke
+  Spalte sonst als leeren Streifen offen hält, blendet das Skript dabei mit aus.
+  Bei geschlossener Leiste steht die Seite wieder im Original. Als Sicherheitsnetz brechen im Spielbereich zu lange
   Wörter um (`overflow-wrap: anywhere`), statt sich zu überlagern.
 
 Der Stand wird pro Tag in `localStorage` gespeichert (`geozee-puzzler:v1:<datum>`)
@@ -95,7 +96,7 @@ nach einem echten Spielzug (React baut das Board dabei neu auf).
 
 Für die Anzeigenspalten nachgemessen (Fenster 1618 px, Leiste 960 px, Anzeigen
 geblockt): vorher 214 px für das Board (Karten 47 px breit, 36 überlaufende
-Textelemente), nachher 528 px (Karten 152 px, kein Überlauf). Bei maximaler
+Textelemente), nachher 643 px (Karten 190 px, kein Überlauf). Bei maximaler
 Leistenbreite und in einem 1024-px-Fenster bleibt das Board ebenfalls
 überlaufsfrei; mit geschlossener Leiste stehen die Spalten wieder bei 350 px
 wie im Original.

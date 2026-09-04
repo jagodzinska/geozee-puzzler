@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geozee Puzzler
 // @namespace    jago/geozee-puzzler
-// @version      1.5.0
+// @version      1.5.1
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
@@ -460,6 +460,11 @@ html.${NS}-open .${NS}-rail {
   flex: 0 0 auto !important;
   width: auto !important;
 }
+/* Ohne Anzeige bleibt in der linken Spalte nur der "Remove ads"-Knopf stehen
+   und hält sie als leeren Streifen offen – der geht bei offener Leiste mit weg.
+   Getroffen wird nur der direkte Link der Spalte, Anzeigen selbst stecken in
+   den <div>s darunter und behalten ihren Platz.                              */
+html.${NS}-open .${NS}-rail > a { display: none !important; }
 /* Sicherheitsnetz: bleibt der Bereich trotzdem eng (Tablet, sehr breite
    Leiste), brechen zu lange Wörter um, statt aus ihrer Karte zu laufen.
    "anywhere" statt "break-word", weil nur das auch die Mindestbreite der
