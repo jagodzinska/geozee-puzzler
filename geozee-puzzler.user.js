@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Geozee Puzzler
 // @namespace    jago/geozee-puzzler
-// @version      1.5.1
+// @version      1.6.0
 // @description  Seitenleiste zum Vorsortieren der Geozee-Flaggen: Alle 9 Länder per Drag&Drop (oder Klick) in die 9 Kategorien schieben, beliebig umsortieren, dann die fertige Zuordnung händisch im Spiel eintragen. Nutzt ausschließlich Infos, die ohnehin auf der Seite stehen (Flagge, Ländername, Kategoriename + Regel) – spoilert also nichts.
 // @author       jago/claude
 // @license      MIT
@@ -443,6 +443,35 @@
 .${NS}-shift-offset { margin-left: calc(var(--${NS}-shift, 0px) / -2) !important; }
 .${NS}-shift-auto { margin-right: var(--${NS}-shift, 0px) !important; }
 
+/* --- Blätterpfeile im Flaggen-Dialog (siehe enhanceFlagDialog) -------------
+   Die Pfeile sitzen mittig auf dem linken/rechten Dialogrand, auf Höhe der
+   Flagge ("top" setzt das Skript), der Zähler mittig auf dem oberen Rand. Verschoben wird per transform – das ist
+   hier unser eigenes Element, nicht der von Tailwind zentrierte Dialog.      */
+.${NS}-flag-nav {
+  position: absolute; top: 50%; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: calc(var(--spacing, .25rem) * 10); height: calc(var(--spacing, .25rem) * 10);
+  padding: 0; border-radius: 9999px;
+  border: 1px solid var(--border, #e8e4dd);
+  background: var(--surface, #fff); color: var(--foreground, #2d2d2d);
+  box-shadow: 0 4px 12px rgb(0 0 0 / .15);
+  cursor: pointer;
+  transition: border-color .15s, background-color .15s, color .15s;
+}
+.${NS}-flag-nav:hover { border-color: var(--primary, #7d9b76); color: var(--primary, #7d9b76); }
+.${NS}-flag-nav:focus-visible { outline: 2px solid var(--primary, #7d9b76); outline-offset: 2px; }
+.${NS}-flag-prev { left: 0; transform: translate(-50%, -50%); }
+.${NS}-flag-next { right: 0; transform: translate(50%, -50%); }
+.${NS}-flag-count {
+  position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
+  padding: calc(var(--spacing, .25rem) * 1) calc(var(--spacing, .25rem) * 3);
+  border-radius: 9999px; border: 1px solid var(--border, #e8e4dd);
+  background: var(--surface, #fff); color: var(--muted, #6b7280);
+  box-shadow: 0 4px 12px rgb(0 0 0 / .15);
+  font-size: var(--text-xs, .75rem); font-weight: 700; line-height: 1rem;
+  white-space: nowrap;
+}
+
 /* --- Anzeigenspalten der Seite schmal halten -------------------------------
    Das Board sitzt in einer Flex-Zeile aus drei Spalten: links und rechts je
    eine Anzeigenspalte ("flex-1 max-w-[350px]"), dazwischen das Spiel. Alle
@@ -852,11 +881,95 @@ html.${NS}-open main { overflow-wrap: anywhere; }
     }
   }
 
+  // ===========================================================================
+  // Flaggen-Dialog: mit Pfeilen durch die Warteschlange blättern
+  //
+  // Der Dialog ist ein Radix-Dialog mit <img> der Flagge, <h2> mit dem Namen
+  // und einer unsichtbaren Beschreibung ("Flag of …"). Statt ihn zu schließen
+  // und im Spiel die nächste Flagge anzuklicken, werden nur diese drei Inhalte
+  // ausgetauscht – das Spiel bekommt davon nichts mit. React schreibt sie nicht
+  // zurück, weil sich an seinen Props nichts ändert; beim Schließen wirft Radix
+  // den ganzen Dialog samt Pfeilen weg. Die Pfeile müssen IM Dialog liegen,
+  // sonst gilt ein Klick darauf als "außerhalb" und schließt ihn.
+  // ===========================================================================
+
+  const CHEVRON = (d) =>
+    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" ` +
+    `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+
+  function enhanceFlagDialog() {
+    for (const dlg of document.querySelectorAll('[role="dialog"]')) {
+      if (dlg.hasAttribute(`data-${NS}-nav`) || dlg.closest(`#${NS}-root`)) continue;
+      const img = dlg.querySelector('img[src*="/flags/"]');
+      const title = dlg.querySelector('h2');
+      if (!img || !title) continue;
+
+      const list = scrapeCountries();
+      const startCode = (img.getAttribute('src').match(FLAG_RE) || [])[1];
+      let idx = list.findIndex((c) => c.code === startCode);
+      if (idx < 0 || list.length < 2) continue; // keine Flagge aus der Warteschlange
+      dlg.setAttribute(`data-${NS}-nav`, '');
+
+      const desc = document.getElementById(dlg.getAttribute('aria-describedby') || '');
+      let shownName = list[idx].name;
+
+      const counter = document.createElement('span');
+      counter.className = `${NS}-flag-count`;
+      const mkBtn = (dir, label, path) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `${NS}-flag-nav ${NS}-flag-${dir}`;
+        b.title = label;
+        b.setAttribute('aria-label', label);
+        b.innerHTML = CHEVRON(path);
+        return b;
+      };
+      const prev = mkBtn('prev', 'Vorherige Flagge (←)', 'm15 18-6-6 6-6');
+      const next = mkBtn('next', 'Nächste Flagge (→)', 'm9 18 6-6-6-6');
+      dlg.append(counter, prev, next);
+
+      // Pfeile mittig neben die Flagge – deren Höhe hängt vom Seitenverhältnis ab
+      const alignArrows = () => {
+        const top = img.offsetTop + img.offsetHeight / 2 + 'px';
+        prev.style.top = next.style.top = top;
+      };
+
+      const show = (i) => {
+        idx = (i + list.length) % list.length;
+        const c = list[idx];
+        // Name nur im Text ersetzen, damit Zusätze wie "Flag of" erhalten bleiben
+        const swap = (s) => (s && s.includes(shownName) ? s.replace(shownName, c.name) : c.name);
+        img.src = c.src;
+        img.alt = swap(img.alt);
+        if (desc) desc.textContent = swap(desc.textContent);
+        const text = [...title.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+        if (text) text.nodeValue = c.name;
+        else title.textContent = c.name;
+        shownName = c.name;
+        counter.textContent = `${idx + 1} / ${list.length}`;
+        alignArrows();
+      };
+
+      prev.addEventListener('click', () => show(idx - 1));
+      next.addEventListener('click', () => show(idx + 1));
+      dlg.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+        ev.preventDefault();
+        show(idx + (ev.key === 'ArrowLeft' ? -1 : 1));
+      });
+      img.addEventListener('load', alignArrows);
+
+      counter.textContent = `${idx + 1} / ${list.length}`;
+      alignArrows();
+    }
+  }
+
   function queueOverlayScan() {
     if (!overlayFrame) {
       overlayFrame = requestAnimationFrame(() => {
         tagAdRails();
         scanOverlays();
+        enhanceFlagDialog();
       });
     }
   }

@@ -42,6 +42,13 @@ jeder Änderung hochgezählt werden.
   Konfetti, Cookie-Banner) und geht beim Breiterziehen live mit; ist die Leiste
   geschlossen, sitzt wieder alles wie im Original.
 
+- **Durch die Flaggen blättern**: Im vergrößerten Flaggen-Dialog sitzen links
+  und rechts Pfeile (alternativ `←`/`→`), oben ein Zähler `4 / 9`. Geblättert
+  wird durch die 9 Länder der Warteschlange, am Ende geht es vorne weiter. Das
+  Skript tauscht dafür nur Flagge und Namen im offenen Dialog aus — im Spiel
+  wird nichts angeklickt, die aktuelle Auswahl („Now placing“) bleibt, wie sie
+  ist. Gilt unabhängig davon, ob die Leiste offen ist.
+
 - **Platz für das Spiel**: Geozee stellt links und rechts neben das Board je
   eine Anzeigenspalte (`flex-1 max-w-[350px]`). Die wachsen genauso stark wie
   das Spiel selbst, das Board bekommt also nur ein Drittel der Breite – auch
